@@ -43,23 +43,30 @@
 # 20141007 - Fixed supportedapi array (Thanks, Christian)
 # 20150420 - Added support for API Version 16 in SW 2.3 (Thank you, Ugur and Bren)
 # 20150630 - Fixed error message from eval_modules
+# 20150719 - Updated code to satisfy perlcritic.com at severity level 4
 # 20150731 - Added support to set issue date for errata
 # 20150903 - Fixed error when setting issue date
-
-# Test for required modules
-&eval_modules;
+# 20150906 - Merged code in GitHub, reapplying code changes from Perl::Critic (Level 4 and 5)
 
 # Load modules
 use strict;
 use warnings;
 use Getopt::Long;
+use IO::Handle;
+
+# Test for required modules
+&eval_modules;
 import Frontier::Client;
 import Text::Unidecode;
 import XML::Simple;
 
 # Version information
-my $version = "20150903";
+my $version = "20150906";
 my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0' );
+
+# Disable output buffering
+*STDOUT->autoflush();
+*STDERR->autoflush();
 
 # Spacewalk Version => API cheatsheet
 # 0.6 => 10.9  == TESTED
@@ -81,7 +88,6 @@ my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0',
 # 2.3 => 16    == TESTED
 
 # Variable declation
-$| = 1;
 my $server;
 my $client;
 my $apiversion;
@@ -112,7 +118,6 @@ my ($pkg, $allpkg, $pkgdetails, $package);
 my (@packages, @pkgids);
 my @channels;
 my ($advisory, $advid, $ovalid);
-my $getdetails;
 my $userroles;
 my %existing;
 my $authtime;
@@ -129,9 +134,9 @@ $getopt = GetOptions( 'server=s'		=> \$server,
                       'debug'			=> \$debug,
                       'quiet'			=> \$quiet,
                       'publish'			=> \$publish,
-		      'security'		=> \$security,
-		      'bugfix'			=> \$bugfix,
-		      'enhancement'		=> \$enhancement,
+                      'security'		=> \$security,
+                      'bugfix'			=> \$bugfix,
+                      'enhancement'		=> \$enhancement,
                       'sync-channels'		=> \$syncchannels,
                       'sync-timeout=i'		=> \$synctimeout,
                       'include-channels:s{,}'	=> \@includechannels,
@@ -142,10 +147,8 @@ $getopt = GetOptions( 'server=s'		=> \$server,
                      );
 
 # Check for arguments
-if ( not(defined($erratafile)) || not(defined($server)) ) {
-  &usage;
-  exit 1;
-}
+if (not(defined($erratafile))) { &usage; exit 1 };
+if (not(defined($server))) { &usage; exit 1 };
 
 # Do we have a proper errata file?
 if (not(-f $erratafile)) {
@@ -159,7 +162,7 @@ if (not(-f $erratafile)) {
 #############################
 # Initialize API connection #
 #############################
-$client = new Frontier::Client(url => "http://$server/rpc/api");
+$client = Frontier::Client->new(url => "http://$server/rpc/api");
 
 #########################################
 # Get the API version we are talking to #
@@ -298,7 +301,7 @@ foreach my $errata (@$unpuberrata) {
 }
 
 # Go through each channel 
-foreach $channel (sort(@$channellist)) {
+foreach my $channel (sort(@$channellist)) {
 
   # Collect existing errata
   my $channelerrata = $client->call('channel.software.list_errata', $session, $channel->{'label'});
@@ -375,7 +378,7 @@ foreach $channel (sort(@$channellist)) {
   $allpkg = $client->call('channel.software.list_all_packages', $session, $channel->{'label'});
 
   # Go through each package
-  foreach $pkg (@$allpkg) {
+  foreach my $pkg (@$allpkg) {
 
     # Get the details of the current package
     $pkgdetails = $client->call('packages.get_details', $session, $pkg->{id});
@@ -391,7 +394,7 @@ foreach $channel (sort(@$channellist)) {
 ##############################
 
 # Go through each <errata>
-foreach $advisory (sort(keys(%{$xml}))) {
+foreach my $advisory (sort(keys(%{$xml}))) {
 
   # Check for reauthentication
   if (time > ($authtime + 5400)) { &reauthenticate; }
@@ -482,7 +485,7 @@ foreach $advisory (sort(keys(%{$xml}))) {
 
       # Create an array of CVEs from Red Hat OVAL file to add to Errata later
       if ( ref($rhsaxml->{definitions}->{definition}->{$ovalid}->{metadata}->{reference}) eq 'ARRAY') {
-        foreach $reference (@{$rhsaxml->{definitions}->{definition}->{$ovalid}->{metadata}->{reference}}) {
+        foreach my $reference (@{$rhsaxml->{definitions}->{definition}->{$ovalid}->{metadata}->{reference}}) {
           if ($reference->{source} eq 'CVE') {
              push(@cves, $reference->{ref_id});
           }
@@ -494,8 +497,8 @@ foreach $advisory (sort(keys(%{$xml}))) {
     # Handle CVEs attached to Debian announcements
     if (defined($xml->{$advisory}->{cves})) {
       if ( ref($xml->{$advisory}->{cves}) eq 'ARRAY') {
-        foreach $_ ( @{$xml->{$advisory}->{cves}} ) {
-          push(@cves, $_);
+        foreach my $cve ( @{$xml->{$advisory}->{cves}} ) {
+          push(@cves, $cve);
         }
       } else {
         # one CVE only
@@ -506,8 +509,8 @@ foreach $advisory (sort(keys(%{$xml}))) {
     # Handle keywords attached to CentOS/Debian announcements
     if (defined($xml->{$advisory}->{keywords})) {
       if ( ref($xml->{$advisory}->{keywords}) eq 'ARRAY') {
-        foreach $_ ( @{$xml->{$advisory}->{keywords}} ) {
-          push(@keywords, $_);
+        foreach my $keyword ( @{$xml->{$advisory}->{keywords}} ) {
+          push(@keywords, $keyword);
         }
       } else {
         # one keyword only
@@ -538,14 +541,14 @@ foreach $advisory (sort(keys(%{$xml}))) {
 
         # Add issue date (requires API version 12 or higher)
         if ($apiversion >= 12) {
-	  if ($xml->{$advisory}->{issue_date} =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}:\d{2}:\d{2})/) {
-	    &info("Adding issue date to $advid\n");
+          if ($xml->{$advisory}->{issue_date} =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}:\d{2}:\d{2})/) {
+            &info("Adding issue date to $advid\n");
             undef %erratadetails;
-	    $erratadetails{'issue_date'} = $client->date_time("$1$2$3T$4");
-	    $result = $client->call('errata.set_details', $session, $advid, \%erratadetails);
-	  } else {
-	    &warning("$advid has no proper issue date\n");
-	  }
+            $erratadetails{'issue_date'} = $client->date_time("$1$2$3T$4");
+            $result = $client->call('errata.set_details', $session, $advid, \%erratadetails);
+          } else {
+            &warning("$advid has no proper issue date\n");
+          }
         }
 
         # Do extra stuff if --publish is set
@@ -565,19 +568,19 @@ foreach $advisory (sort(keys(%{$xml}))) {
           
           # Reverse useless copying of packages around by publish
           if (not($autopush)) {
-            foreach $pkg (@packages) {
+            foreach my $pkg (@packages) {
               # Log previous and current channel membership
               @autopushed = ();
               @inchannel = ();
               &debug("Previous channel membership for $pkg: ".join(',',@{$id2channel{$pkg}})."\n");
               $channellist = $client->call('packages.list_providing_channels', $session, $pkg);
-              foreach $channel (@$channellist) {
+              foreach my $channel (@$channellist) {
                  push(@inchannel, $channel->{label});
               }
               &debug("Current channel membership for $pkg: ".join(',',@inchannel)."\n");
 
               # Check if package was in channel before publishing errata
-              foreach $channel (@$channellist) {
+              foreach my $channel (@$channellist) {
 		foreach (@{$id2channel{$pkg}}) {
                   # It wasn't. Note to @autopushed for removal
                   if (not(/^$channel->{label}$/)) { push(@autopushed, $channel->{label}); }
@@ -589,7 +592,7 @@ foreach $advisory (sort(keys(%{$xml}))) {
                 # Remove packages from channel(s) it didn't belong to earlier
                 if (@autopushed >= 1) {
                   &debug("Package $pkg has been auto-pushed to ".join(',',@autopushed)."\n");
-                  foreach $undopush (@autopushed) {
+                  foreach my $undopush (@autopushed) {
                     &debug("Removing package $pkg from $undopush\n");
                     $result = $client->call('channel.software.remove_packages', $session, $undopush, $pkg);
                   }
@@ -631,29 +634,34 @@ if (not($publish)) {
 exit;
 
 # SUBS
-sub debug() {
+sub debug {
   if ($debug) { print "DEBUG: @_"; }
+  return;
 }
 
-sub info() {
+sub info {
   if ($quiet) { return; }
   print "INFO: @_";
+  return;
 }
 
-sub warning() {
+sub warning {
   print "WARNING: @_";
+  return;
 }
 
-sub error() {
+sub error {
   print "ERROR: @_";
+  return;
 }
 
-sub notice() {
+sub notice {
   if ($quiet) { return; }
   print "NOTICE: @_";
+  return;
 }
 
-sub usage() {
+sub usage {
   print "Usage: $0 --server <SERVER> --errata <ERRATA-FILE>\n";
   print "       [ --rhsa-oval <REDHAT-OVAL-XML> |\n";
   print "         --include-channels=<CHANNELS> | --exclude-channels=<CHANNELS> |\n";
@@ -685,9 +693,10 @@ sub usage() {
   print "  --quiet\t\tOnly print warnings and errors\n";
   print "  --debug\t\tSet verbosity to debug (use this when reporting issues!)\n";
   print "\n";
+  return;
 }
 
-sub eval_modules() {
+sub eval_modules {
   eval { require Frontier::Client; };
   if ($@) { die "ERROR: You are missing Frontier::Client\n       CentOS: yum install perl-Frontier-RPC\n"; };
 
@@ -696,25 +705,30 @@ sub eval_modules() {
 
   eval { require XML::Simple; };
   if ($@) { die "ERROR: You are missing XML::Simple\n       CentOS: yum install perl-XML-Simple\n"; };
+
+  return;
 }
 
-sub uniq() {
+sub uniq {
+  my (@input) = @_;
   my %all = ();
-  @all{@_} = 1;
+  @all{@input} = 1;
   return (keys %all);
 }
 
-sub login() {
+sub login {
   $session = $client->call('auth.login', "$ENV{'SPACEWALK_USER'}", "$ENV{'SPACEWALK_PASS'}");
   $authtime = time;
+  return;
 }
 
-sub logout() {
+sub logout {
   &debug("Logging out.\n");
   $client->call('auth.logout', $session);
+  return;
 }
 
-sub reauthenticate() {
+sub reauthenticate {
   &info("Reauthentication required\n");
 
   &debug("Current Session ID: $session\n");
@@ -722,15 +736,17 @@ sub reauthenticate() {
 
   &login;
   &debug("New Session ID: $session\n");
+  return;
 }
 
-sub find_packages() {
+sub find_packages {
+  my ($advisory) = @_;
   #  INPUT: Advisory, e.g. CESA-2013:0123
   # OUTPUT: Array of Package IDs, Array of Channel Labels
 
   # Find package IDs mentioned in errata
-  if ( ref($xml->{$_[0]}->{packages}) eq 'ARRAY') {
-    foreach $package ( @{$xml->{$_[0]}->{packages}} ) {
+  if ( ref($xml->{$advisory}->{packages}) eq 'ARRAY') {
+    foreach my $package ( @{$xml->{$advisory}->{packages}} ) {
       if (defined($name2id{$package})) {
         # We found it, nice
         &debug("Package: $package -> $name2id{$package} -> $name2channel{$package} \n");
@@ -746,28 +762,32 @@ sub find_packages() {
      }
   } else {
     # errata has only one package
-    if (defined($name2id{$xml->{$_[0]}->{packages}})) {
+    if (defined($name2id{$xml->{$advisory}->{packages}})) {
       # the one and only package is found
-      &debug("Package: $xml->{$_[0]}->{packages} -> $name2id{$xml->{$_[0]}->{packages}} -> $name2channel{$xml->{$_[0]}->{packages}} \n");
-      push(@packages, $name2id{$xml->{$_[0]}->{packages}});
-      push(@channels, $name2channel{$xml->{$_[0]}->{packages}});
+      &debug("Package: $xml->{$advisory}->{packages} -> $name2id{$xml->{$advisory}->{packages}} -> $name2channel{$xml->{$advisory}->{packages}} \n");
+      push(@packages, $name2id{$xml->{$advisory}->{packages}});
+      push(@channels, $name2channel{$xml->{$advisory}->{packages}});
     } else {
       # no hit
-      &debug("Package: $xml->{$_[0]}->{packages} not found\n");
+      &debug("Package: $xml->{$advisory}->{packages} not found\n");
     }
   }
 
+  return;
 }
 
-sub list_packages() {
+sub list_packages {
+  my ($advisory) = @_;
   #  INPUT: Advisory, e.g. CESA-2013:0123
   # OUTPUT: Array of Package IDs
  
   @pkgids = ();
-  my $listpackages = $client->call('errata.list_packages', $session, $_[0]);
+  my $listpackages = $client->call('errata.list_packages', $session, $advisory);
   foreach my $package (@$listpackages) {
     push(@pkgids, $package->{'id'});
   }
 
-  &debug("$_[0] packages: ".join(' ',@pkgids)."\n");
+  &debug("$advisory packages: ".join(' ',@pkgids)."\n");
+
+  return;
 }
