@@ -61,8 +61,8 @@ import Text::Unidecode;
 import XML::Simple;
 
 # Version information
-my $version = "20150906";
-my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0' );
+my $version = "20151011";
+my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0' );
 
 # Disable output buffering
 *STDOUT->autoflush();
