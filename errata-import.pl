@@ -8,7 +8,6 @@
 # perl-XML-Simple, perl-Text-Unidecode and perl-Frontier-RPC
 #
 # Author: Steve Meier
-# Date: 28.07.2014
 #
 # History:
 # 20120206 - Initial version
@@ -47,6 +46,7 @@
 # 20150731 - Added support to set issue date for errata
 # 20150903 - Fixed error when setting issue date
 # 20150906 - Merged code in GitHub, reapplying code changes from Perl::Critic (Level 4 and 5)
+# 20151011 - Added support for API Version 17 in SW 2.4
 
 # Load modules
 use strict;
