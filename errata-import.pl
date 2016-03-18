@@ -47,6 +47,8 @@
 # 20150903 - Fixed error when setting issue date
 # 20150906 - Merged code in GitHub, reapplying code changes from Perl::Critic (Level 4 and 5)
 # 20151011 - Added support for API Version 17 in SW 2.4
+# 20160317 - Fixed error in autopush that removed packages it shouldn't (Thanks, Helmut and Martin)
+#            Made some changes suggested by perlcritic -3
 
 # Load modules
 use strict;
@@ -61,7 +63,7 @@ import Text::Unidecode;
 import XML::Simple;
 
 # Version information
-my $version = "20151011";
+my $version = "20160317";
 my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0' );
 
 # Disable output buffering
@@ -128,22 +130,22 @@ my $excludeerrata;
 if (join(' ',@ARGV) =~ /--debug/) { print STDERR "DEBUG: Called as $0 ".join(' ',@ARGV)."\n"; }
 
 # Parse arguments
-$getopt = GetOptions( 'server=s'		=> \$server,
-                      'errata=s'		=> \$erratafile,
-                      'rhsa-oval=s'		=> \$rhsaovalfile,
-                      'debug'			=> \$debug,
-                      'quiet'			=> \$quiet,
-                      'publish'			=> \$publish,
-                      'security'		=> \$security,
-                      'bugfix'			=> \$bugfix,
-                      'enhancement'		=> \$enhancement,
-                      'sync-channels'		=> \$syncchannels,
-                      'sync-timeout=i'		=> \$synctimeout,
-                      'include-channels:s{,}'	=> \@includechannels,
-                      'exclude-channels:s{,}'	=> \@excludechannels,
-                      'autopush'		=> \$autopush,
-                      'ignore-api-version'      => \$ignoreapiversion,
-                      'exclude-errata=s'	=> \$excludeerrata
+$getopt = GetOptions( 'server=s'              => \$server,
+                      'errata=s'              => \$erratafile,
+                      'rhsa-oval=s'           => \$rhsaovalfile,
+                      'debug'                 => \$debug,
+                      'quiet'                 => \$quiet,
+                      'publish'               => \$publish,
+                      'security'              => \$security,
+                      'bugfix'                => \$bugfix,
+                      'enhancement'           => \$enhancement,
+                      'sync-channels'         => \$syncchannels,
+                      'sync-timeout=i'        => \$synctimeout,
+                      'include-channels:s{,}' => \@includechannels,
+                      'exclude-channels:s{,}' => \@excludechannels,
+                      'autopush'              => \$autopush,
+                      'ignore-api-version'    => \$ignoreapiversion,
+                      'exclude-errata=s'      => \$excludeerrata
                      );
 
 # Check for arguments
@@ -579,25 +581,17 @@ foreach my $advisory (sort(keys(%{$xml}))) {
               }
               &debug("Current channel membership for $pkg: ".join(',',@inchannel)."\n");
 
-              # Check if package was in channel before publishing errata
-              foreach my $channel (@$channellist) {
-		foreach (@{$id2channel{$pkg}}) {
-                  # It wasn't. Note to @autopushed for removal
-                  if (not(/^$channel->{label}$/)) { push(@autopushed, $channel->{label}); }
+              @autopushed = only_in_first(\@inchannel, \@{$id2channel{$pkg}});
+              @autopushed = &uniq(@autopushed);
+
+              # Remove packages from channel(s) it didn't belong to earlier
+              if (@autopushed >= 1) {
+                &debug("Package $pkg has been auto-pushed to ".join(',',@autopushed)."\n");
+                foreach my $undopush (@autopushed) {
+                  &debug("Removing package $pkg from $undopush\n");
+                  $result = $client->call('channel.software.remove_packages', $session, $undopush, $pkg);
                 }
-
-                # I know, ugly hack, again :)
-                @autopushed = &uniq(@autopushed);
-
-                # Remove packages from channel(s) it didn't belong to earlier
-                if (@autopushed >= 1) {
-                  &debug("Package $pkg has been auto-pushed to ".join(',',@autopushed)."\n");
-                  foreach my $undopush (@autopushed) {
-                    &debug("Removing package $pkg from $undopush\n");
-                    $result = $client->call('channel.software.remove_packages', $session, $undopush, $pkg);
-                  }
-                } 
-              }
+              } 
             }
           }
 
@@ -697,14 +691,26 @@ sub usage {
 }
 
 sub eval_modules {
-  eval { require Frontier::Client; };
-  if ($@) { die "ERROR: You are missing Frontier::Client\n       CentOS: yum install perl-Frontier-RPC\n"; };
+  eval {
+    require Frontier::Client;
+    1;
+  } or do {
+    die "ERROR: You are missing Frontier::Client\n       CentOS: yum install perl-Frontier-RPC\n";
+  };
 
-  eval { require Text::Unidecode; };
-  if ($@) { die "ERROR: You are missing Text::Unidecode\n       CentOS: yum install perl-Text-Unidecode\n"; };
+  eval { 
+    require Text::Unidecode; 
+    1;
+  } or do {
+    die "ERROR: You are missing Text::Unidecode\n       CentOS: yum install perl-Text-Unidecode\n";
+  };
 
-  eval { require XML::Simple; };
-  if ($@) { die "ERROR: You are missing XML::Simple\n       CentOS: yum install perl-XML-Simple\n"; };
+  eval { 
+    require XML::Simple;
+    1;
+  } or do {
+    die "ERROR: You are missing XML::Simple\n       CentOS: yum install perl-XML-Simple\n";
+  };
 
   return;
 }
@@ -790,4 +796,23 @@ sub list_packages {
   &debug("$advisory packages: ".join(' ',@pkgids)."\n");
 
   return;
+}
+
+sub only_in_first {
+  my ($list1, $list2) = @_;
+  my @output;
+  my %listhash;
+
+  # Transform array into hash for quicker access
+  foreach (@{$list2}) { $listhash{$_} = 1; }
+
+  # Check each entry in list1 against list2
+  foreach (@{$list1}) {
+    if (not(defined($listhash{$_}))) {
+      push(@output, $_);
+    }
+  }
+
+  # Return entries that are in list1 but not list2
+  return @output;
 }
