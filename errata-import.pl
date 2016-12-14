@@ -50,6 +50,7 @@
 # 20160317 - Fixed error in autopush that removed packages it shouldn't (Thanks, Helmut and Martin)
 #            Made some changes suggested by perlcritic -3
 # 20161214 - Added support for API Version 19 in SW 2.6
+#            Added HTML::Entities to clean HTML codes from Debian errata
 
 # Load modules
 use strict;
