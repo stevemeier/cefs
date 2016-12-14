@@ -49,6 +49,7 @@
 # 20151011 - Added support for API Version 17 in SW 2.4
 # 20160317 - Fixed error in autopush that removed packages it shouldn't (Thanks, Helmut and Martin)
 #            Made some changes suggested by perlcritic -3
+# 20161214 - Added support for API Version 19 in SW 2.6
 
 # Load modules
 use strict;
@@ -63,8 +64,8 @@ import Text::Unidecode;
 import XML::Simple;
 
 # Version information
-my $version = "20160317";
-my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0' );
+my $version = "20161214";
+my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0','19','19.0' );
 
 # Disable output buffering
 *STDOUT->autoflush();
