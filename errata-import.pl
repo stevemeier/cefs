@@ -63,6 +63,14 @@ import Frontier::Client;
 import Text::Unidecode;
 import XML::Simple;
 
+# Test for optional modules
+my $cleanhtml = 0;
+if (eval "require HTML::Entities") {
+  # HTML::Entities is optional for Debian errata
+  # which contain HTML codes
+  $cleanhtml = 1;
+}
+
 # Version information
 my $version = "20161214";
 my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0','19','19.0' );
@@ -473,6 +481,8 @@ foreach my $advisory (sort(keys(%{$xml}))) {
       if ( defined($rhsaxml->{definitions}->{definition}->{$ovalid}->{metadata}->{description}) ) {
         &debug("Using description from $ovalid\n");
         $erratainfo{'description'} = $rhsaxml->{definitions}->{definition}->{$ovalid}->{metadata}->{description};
+	# 20161214: Remove HTML encodings (ATIX Debian Errata)
+	if ($cleanhtml) { decode_entities($erratainfo{'description'}); }
         # Remove Umlauts -- API throws errors if they are included
         $erratainfo{'description'} = unidecode($erratainfo{'description'});
         # Limit to length of 4000 bytes (see https://www.redhat.com/archives/spacewalk-list/2012-June/msg00128.html)
@@ -711,6 +721,15 @@ sub eval_modules {
     1;
   } or do {
     die "ERROR: You are missing XML::Simple\n       CentOS: yum install perl-XML-Simple\n";
+  };
+
+  eval {
+    require HTML::Entities;
+    1;
+  } or do {
+    &info("You do not have the HTML::Entities perl module\n");
+    &info("This may cause problems when importing Debian errata\n");
+    &info("      CentOS: yum install perl-HTML-Parser\n");
   };
 
   return;
