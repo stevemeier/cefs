@@ -52,6 +52,7 @@
 # 20161214 - Added support for API Version 19 in SW 2.6
 #            Added HTML::Entities to clean HTML codes from Debian errata
 # 20161220 - Reworked the integratin of HTML::Entities which is now required
+# 20161221 - Fix warning regarding missing issue_date on Debian errata
 
 # Load modules
 use strict;
@@ -67,7 +68,7 @@ import XML::Simple;
 import HTML::Entities;
 
 # Version information
-my $version = "20161220";
+my $version = "20161221";
 my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0','19','19.0' );
 
 # Disable output buffering
@@ -550,13 +551,15 @@ foreach my $advisory (sort(keys(%{$xml}))) {
 
         # Add issue date (requires API version 12 or higher)
         if ($apiversion >= 12) {
-          if ($xml->{$advisory}->{issue_date} =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}:\d{2}:\d{2})/) {
-            &info("Adding issue date to $advid\n");
-            undef %erratadetails;
-            $erratadetails{'issue_date'} = $client->date_time("$1$2$3T$4");
-            $result = $client->call('errata.set_details', $session, $advid, \%erratadetails);
-          } else {
-            &warning("$advid has no proper issue date\n");
+          if (defined($xml->{$advisory}->{issue_date})) {
+            if ($xml->{$advisory}->{issue_date} =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}:\d{2}:\d{2})/) {
+              &info("Adding issue date to $advid\n");
+              undef %erratadetails;
+              $erratadetails{'issue_date'} = $client->date_time("$1$2$3T$4");
+              $result = $client->call('errata.set_details', $session, $advid, \%erratadetails);
+            } else {
+              &warning("$advid has no proper issue date\n");
+            }
           }
         }
 
