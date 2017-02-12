@@ -53,6 +53,7 @@
 #            Added HTML::Entities to clean HTML codes from Debian errata
 # 20161220 - Reworked the integratin of HTML::Entities which is now required
 # 20161221 - Fix warning regarding missing issue_date on Debian errata
+# 20170212 - Fix various checks on description field that where not called for Debian (Thanks, Bernhard)
 
 # Load modules
 use strict;
@@ -68,7 +69,7 @@ import XML::Simple;
 import HTML::Entities;
 
 # Version information
-my $version = "20161221";
+my $version = "20170212";
 my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0','19','19.0' );
 
 # Disable output buffering
@@ -490,6 +491,20 @@ foreach my $advisory (sort(keys(%{$xml}))) {
         if ( defined($rhsaxml->{definitions}->{definition}->{$ovalid}->{metadata}->{advisory}->{rights}) ) {
           $erratainfo{'notes'}  = "The description and CVE numbers have been taken from Red Hat OVAL definitions.\n\n";
           $erratainfo{'notes'} .= $rhsaxml->{definitions}->{definition}->{$ovalid}->{metadata}->{advisory}->{rights};
+        }
+      }
+ 
+      # Sanitize the description field, if set (20170212: moved down into separate block)
+      if (defined($erratainfo{'description'})) {
+        # 20161214: Remove HTML encodings (ATIX Debian Errata)
+        # 20161220: Always exceute as HTML::Entities is now required
+        decode_entities($erratainfo{'description'}); 
+        # Remove Umlauts -- API throws errors if they are included
+        $erratainfo{'description'} = unidecode($erratainfo{'description'});
+
+        # Limit to length of 4000 bytes (see https://www.redhat.com/archives/spacewalk-list/2012-June/msg00128.html)
+        if (length($erratainfo{'description'}) > 4000) {
+          $erratainfo{'description'} = substr($erratainfo{'description'}, 0, 4000);
         }
       }
 
