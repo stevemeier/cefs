@@ -55,11 +55,8 @@
 # 20161221 - Fix warning regarding missing issue_date on Debian errata
 # 20170212 - Fix various checks on description field that where not called for Debian (Thanks, Bernhard)
 # 20170930 - Added support for API Version 20 in SW 2.7
-<<<<<<< HEAD
 # 20180306 - Republish errata when packages are added
 #            https://github.com/stevemeier/cefs/issues/4
-=======
->>>>>>> fa61a23e8325aff80540bb2599de86a5d720481e
 
 # Load modules
 use strict;
@@ -75,11 +72,7 @@ import XML::Simple;
 import HTML::Entities;
 
 # Version information
-<<<<<<< HEAD
 my $version = "20180306";
-=======
-my $version = "20170930";
->>>>>>> fa61a23e8325aff80540bb2599de86a5d720481e
 my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0','19','19.0','20','20.0' );
 
 # Disable output buffering
