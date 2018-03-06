@@ -204,7 +204,8 @@ if (not($apisupport)) {
   if ($ignoreapiversion) {
     &warning("API version $apiversion has not been tested but you wanted to continue.\n");
   } else {
-    &error("API version $apiversion is not supported. Try upgrading this script.\n");
+    &error("API version $apiversion is not supported. Try upgrading this script\n");
+    &error("or try the --ignore-api-version at your own risk.\n");
     exit 2;
   }
 }
@@ -290,7 +291,7 @@ if (defined($rhsaovalfile)) {
 ##################################
 if ($syncchannels) {
   # API Version must be at least 11
-  unless ($apiversion =~ /^1[1-9]/) {
+  unless ($apiversion < 11) {
     &warning("This API version does not support synching\n");
     $syncchannels = 0;
   }
