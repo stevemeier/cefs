@@ -57,6 +57,7 @@
 # 20170930 - Added support for API Version 20 in SW 2.7
 # 20180306 - Republish errata when packages are added
 #            https://github.com/stevemeier/cefs/issues/4
+# 20180307 - Report errata updated (not only created)
 
 # Load modules
 use strict;
@@ -72,7 +73,7 @@ import XML::Simple;
 import HTML::Entities;
 
 # Version information
-my $version = "20180306";
+my $version = "20180307";
 my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0','19','19.0','20','20.0' );
 
 # Disable output buffering
@@ -116,6 +117,7 @@ my $security = 0;
 my $bugfix = 0;
 my $enhancement = 0;
 my $created = 0;
+my $updated = 0;
 my $debug = 0;
 my $quiet = 0;
 my $syncchannels = 0;
@@ -645,6 +647,7 @@ foreach my $advisory (sort(keys(%{$xml}))) {
       &info("Adding packages to $advid\n");
       # Maybe we just need this one call
       my $addpackages = $client->call('errata.add_packages', $session, $advid, \@packages);
+      $updated++;
     }
     if ($publish) {
       &info("Republishing $advid\n");
@@ -657,6 +660,7 @@ foreach my $advisory (sort(keys(%{$xml}))) {
 
 # FIN
 &info("Errata created: $created\n");
+&info("Errata updated: $updated\n");
 if (not($publish)) {
   &info("Errata have been created but NOT published!\n");
   &info("Please go to: Errata -> Manage Errata -> Unpublished to find them\n");
