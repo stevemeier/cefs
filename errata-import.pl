@@ -58,6 +58,7 @@
 # 20180306 - Republish errata when packages are added
 #            https://github.com/stevemeier/cefs/issues/4
 # 20180307 - Report errata updated (not only created)
+#            Fix accidental republishing of all errata
 
 # Load modules
 use strict;
@@ -648,13 +649,15 @@ foreach my $advisory (sort(keys(%{$xml}))) {
       # Maybe we just need this one call
       my $addpackages = $client->call('errata.add_packages', $session, $advid, \@packages);
       $updated++;
-    }
-    if ($publish) {
-      &info("Republishing $advid\n");
-      foreach my $pkg (@packages) {
-        my $addpackages = $client->call('errata.publish', $session, $advid, \@{$id2channel{$pkg}});
+    
+      if ($publish) {
+        &info("Republishing $advid\n");
+        foreach my $pkg (@packages) {
+          my $addpackages = $client->call('errata.publish', $session, $advid, \@{$id2channel{$pkg}});
+        }
       }
     }
+
   }
 }
 
