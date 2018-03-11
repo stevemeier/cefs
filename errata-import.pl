@@ -59,6 +59,7 @@
 #            https://github.com/stevemeier/cefs/issues/4
 # 20180307 - Report errata updated (not only created)
 #            Fix accidental republishing of all errata
+# 20180311 - Fix --sync-channels option
 
 # Load modules
 use strict;
@@ -74,7 +75,7 @@ import XML::Simple;
 import HTML::Entities;
 
 # Version information
-my $version = "20180307";
+my $version = "20180311";
 my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0','19','19.0','20','20.0' );
 
 # Disable output buffering
@@ -294,7 +295,7 @@ if (defined($rhsaovalfile)) {
 ##################################
 if ($syncchannels) {
   # API Version must be at least 11
-  unless ($apiversion < 11) {
+  unless ($apiversion >= 11) {
     &warning("This API version does not support synching\n");
     $syncchannels = 0;
   }
