@@ -60,6 +60,8 @@
 # 20180307 - Report errata updated (not only created)
 #            Fix accidental republishing of all errata
 # 20180311 - Fix --sync-channels option
+# 20180327 - Be more selective when re-publishing errata
+#            https://github.com/stevemeier/cefs/issues/4
 
 # Load modules
 use strict;
@@ -75,7 +77,7 @@ import XML::Simple;
 import HTML::Entities;
 
 # Version information
-my $version = "20180311";
+my $version = "20180327";
 my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0','19','19.0','20','20.0' );
 
 # Disable output buffering
@@ -652,9 +654,20 @@ foreach my $advisory (sort(keys(%{$xml}))) {
       $updated++;
     
       if ($publish) {
-        &info("Republishing $advid\n");
+        # Check which channels the errata currently applies to
+        # We should not republish to this channel, only to new ones
+        my $applicable = $client->call('errata.applicable_to_channels', $session, $advid);
+
+        # Put data into a more handy array
+        my @applicablechannels;
+        foreach (@{$applicable}) { push(@applicablechannels, $_->{'label'}) }
+
         foreach my $pkg (@packages) {
-          my $addpackages = $client->call('errata.publish', $session, $advid, \@{$id2channel{$pkg}});
+          foreach my $channel (only_in_first(\@{$id2channel{$pkg}}, \@applicablechannels)) {
+            &info("Republishing $advid\n");
+            &debug("Republishing $advid to channel $channel\n");
+            my $addpackages = $client->call('errata.publish', $session, $advid, [ $channel ]);
+          }
         }
       }
     }
