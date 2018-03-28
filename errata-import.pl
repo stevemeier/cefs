@@ -62,6 +62,8 @@
 # 20180311 - Fix --sync-channels option
 # 20180327 - Be more selective when re-publishing errata
 #            https://github.com/stevemeier/cefs/issues/4
+# 20180328 - Republishing was still not selective enough
+#            Added support for API version 18 (SW 2.5)
 
 # Load modules
 use strict;
@@ -77,8 +79,8 @@ import XML::Simple;
 import HTML::Entities;
 
 # Version information
-my $version = "20180327";
-my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0','19','19.0','20','20.0' );
+my $version = "20180328";
+my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0','18','18.0','19','19.0','20','20.0' );
 
 # Disable output buffering
 *STDOUT->autoflush();
@@ -662,13 +664,19 @@ foreach my $advisory (sort(keys(%{$xml}))) {
         my @applicablechannels;
         foreach (@{$applicable}) { push(@applicablechannels, $_->{'label'}) }
 
+        my @repubchannels;
         foreach my $pkg (@packages) {
           foreach my $channel (only_in_first(\@{$id2channel{$pkg}}, \@applicablechannels)) {
-            &info("Republishing $advid\n");
-            &debug("Republishing $advid to channel $channel\n");
-            my $addpackages = $client->call('errata.publish', $session, $advid, [ $channel ]);
+            push(@repubchannels, $channel);
           }
         }
+
+        @repubchannels = &uniq(@repubchannels);
+            
+        &info("Republishing $advid\n");
+        &debug("Republishing $advid to channel ".join(',',@repubchannels)."\n");
+        my $addpackages = $client->call('errata.publish', $session, $advid, \@repubchannels);
+        
       }
     }
 
