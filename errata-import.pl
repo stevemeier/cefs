@@ -65,6 +65,7 @@
 # 20180328 - Republishing was still not selective enough
 #            Added support for API version 18 (SW 2.5)
 # 20180419 - Added support for API Version 20 in SW 2.8
+#            Severity is added to security errata on SW 2.8
 
 # Load modules
 use strict;
@@ -595,6 +596,24 @@ foreach my $advisory (sort(keys(%{$xml}))) {
             }
           }
         }
+
+	# Add severity to security errata (requires API version 21 or higher)
+	if ($apiversion >= 21) {
+          if ($advid =~ /CESA/ix) {
+	    if (defined($xml->{$advisory}->{severity})) {
+              if ( ($xml->{$advisory}->{severity} eq 'Low') ||
+	           ($xml->{$advisory}->{severity} eq 'Moderate') ||
+		   ($xml->{$advisory}->{severity} eq 'Important') ||
+		   ($xml->{$advisory}->{severity} eq 'Critical') ){
+
+                &info("Adding severity (".$xml->{$advisory}->{severity}.") to $advid\n");
+                undef %erratadetails;
+                $erratadetails{'severity'} = $xml->{$advisory}->{severity};
+                $result = $client->call('errata.set_details', $session, $advid, \%erratadetails);
+              }
+	    }
+          }
+	}
 
         # Do extra stuff if --publish is set
         if ($publish) {
