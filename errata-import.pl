@@ -64,7 +64,7 @@
 #            https://github.com/stevemeier/cefs/issues/4
 # 20180328 - Republishing was still not selective enough
 #            Added support for API version 18 (SW 2.5)
-# 20180419 - Added support for API Version 20 in SW 2.8
+# 20180419 - Added support for API Version 21 in SW 2.8
 #            Severity is added to security errata on SW 2.8
 
 # Load modules
