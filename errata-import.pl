@@ -590,6 +590,7 @@ foreach my $advisory (sort(keys(%{$xml}))) {
               &info("Adding issue date to $advid\n");
               undef %erratadetails;
               $erratadetails{'issue_date'} = $client->date_time("$1$2$3T$4");
+              $erratadetails{'update_date'} = $client->date_time("$1$2$3T$4");
               $result = $client->call('errata.set_details', $session, $advid, \%erratadetails);
             } else {
               &warning("$advid has no proper issue date\n");
