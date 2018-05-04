@@ -66,6 +66,7 @@
 #            Added support for API version 18 (SW 2.5)
 # 20180419 - Added support for API Version 21 in SW 2.8
 #            Severity is added to security errata on SW 2.8
+# 20180504 - Merged https://github.com/stevemeier/cefs/pull/7
 
 # Load modules
 use strict;
@@ -81,7 +82,7 @@ import XML::Simple;
 import HTML::Entities;
 
 # Version information
-my $version = "20180419";
+my $version = "20180504";
 my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0','18','18.0','19','19.0','20','20.0','21','21.0' );
 
 # Disable output buffering
