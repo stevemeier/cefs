@@ -4,7 +4,7 @@
 # It relies on preformatted information since parsing email
 # is the road to madness...
 #
-# To run this script on CentOS 5.x you need 
+# To run this script on CentOS you need 
 # perl-XML-Simple, perl-Text-Unidecode and perl-Frontier-RPC
 #
 # Author: Steve Meier
@@ -68,6 +68,7 @@
 #            Severity is added to security errata on SW 2.8
 # 20180504 - Merged https://github.com/stevemeier/cefs/pull/7
 # 20180514 - Hopefully fixed https://github.com/stevemeier/cefs/issues/8
+# 20190125 - Added support for API Version 22 in SW 2.9
 
 # Load modules
 use strict;
@@ -83,8 +84,8 @@ import XML::Simple;
 import HTML::Entities;
 
 # Version information
-my $version = "20180514";
-my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0','18','18.0','19','19.0','20','20.0','21','21.0' );
+my $version = "20190125";
+my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0','18','18.0','19','19.0','20','20.0','21','21.0','22','22.0' );
 
 # Disable output buffering
 *STDOUT->autoflush();
@@ -113,6 +114,7 @@ my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0',
 # 2.6 => 19
 # 2.7 => 20
 # 2.8 => 21
+# 2.9 => 22    == TESTED
 
 # Variable declation
 my $server;
