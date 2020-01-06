@@ -69,6 +69,8 @@
 # 20180504 - Merged https://github.com/stevemeier/cefs/pull/7
 # 20180514 - Hopefully fixed https://github.com/stevemeier/cefs/issues/8
 # 20190125 - Added support for API Version 22 in SW 2.9
+# 20200102 - Work on https://github.com/stevemeier/cefs/issues/21
+# 20200106 - Confirmed fix for https://github.com/stevemeier/cefs/issues/21
 
 # Load modules
 use strict;
@@ -84,7 +86,7 @@ import XML::Simple;
 import HTML::Entities;
 
 # Version information
-my $version = "20190125";
+my $version = "20200106";
 my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0','18','18.0','19','19.0','20','20.0','21','21.0','22','22.0' );
 
 # Disable output buffering
@@ -153,6 +155,7 @@ my %existing;
 my $authtime;
 my $ignoreapiversion;
 my $excludeerrata;
+my @channelscope;
 
 # Print call and parameters if in debug mode (GetOptions will clear @ARGV)
 if (join(' ',@ARGV) =~ /--debug/) { print STDERR "DEBUG: Called as $0 ".join(' ',@ARGV)."\n"; }
@@ -403,6 +406,8 @@ foreach my $channel (sort(@$channellist)) {
     }
   }
 
+  # Channel is in scope so we scan it
+  push(@channelscope, $channel->{'label'});
   &info("Scanning channel $channel->{'name'}\n");
 
   # Get all packages in current channel
@@ -655,8 +660,10 @@ foreach my $advisory (sort(keys(%{$xml}))) {
               if (@autopushed >= 1) {
                 &debug("Package $pkg has been auto-pushed to ".join(',',@autopushed)."\n");
                 foreach my $undopush (@autopushed) {
-                  &debug("Removing package $pkg from $undopush\n");
-                  $result = $client->call('channel.software.remove_packages', $session, $undopush, $pkg);
+	          if (&in_scope($undopush)) {  # Added to fix GitHub issue #21
+                    &debug("Removing package $pkg from $undopush\n");
+                    $result = $client->call('channel.software.remove_packages', $session, $undopush, $pkg);
+		  }
                 }
               } 
             }
@@ -919,4 +926,14 @@ sub only_in_first {
 
   # Return entries that are in list1 but not list2
   return @output;
+}
+
+sub in_scope {
+  # Checks if a channel is in scope, returns 1 if yes, 0 otherwise
+  my $channel = @_;
+  if (grep { /$channel/ } @channelscope ) {
+    return 1;
+  }
+
+  return 0;
 }
