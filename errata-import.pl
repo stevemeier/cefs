@@ -71,6 +71,7 @@
 # 20190125 - Added support for API Version 22 in SW 2.9
 # 20200102 - Work on https://github.com/stevemeier/cefs/issues/21
 # 20200106 - Confirmed fix for https://github.com/stevemeier/cefs/issues/21
+# 20200322 - Added support for API Version 23 in SW 2.10
 
 # Load modules
 use strict;
@@ -86,8 +87,8 @@ import XML::Simple;
 import HTML::Entities;
 
 # Version information
-my $version = "20200106";
-my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0','18','18.0','19','19.0','20','20.0','21','21.0','22','22.0' );
+my $version = "20200322";
+my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0','18','18.0','19','19.0','20','20.0','21','21.0','22','22.0','23','23.0' );
 
 # Disable output buffering
 *STDOUT->autoflush();
@@ -117,6 +118,7 @@ my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0',
 # 2.7 => 20
 # 2.8 => 21
 # 2.9 => 22    == TESTED
+# 2.10 => 23   == TESTED
 
 # Variable declation
 my $server;
