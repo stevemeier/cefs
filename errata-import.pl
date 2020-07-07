@@ -72,6 +72,7 @@
 # 20200102 - Work on https://github.com/stevemeier/cefs/issues/21
 # 20200106 - Confirmed fix for https://github.com/stevemeier/cefs/issues/21
 # 20200322 - Added support for API Version 23 in SW 2.10
+# 20200707 - Added support for API Version 24 in Uyuni 2020.06
 
 # Load modules
 use strict;
@@ -88,7 +89,7 @@ import HTML::Entities;
 
 # Version information
 my $version = "20200322";
-my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0','18','18.0','19','19.0','20','20.0','21','21.0','22','22.0','23','23.0' );
+my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0','18','18.0','19','19.0','20','20.0','21','21.0','22','22.0','23','23.0', '24');
 
 # Disable output buffering
 *STDOUT->autoflush();
@@ -230,6 +231,11 @@ if (not($apisupport)) {
   }
 }
 
+# Publishing is mandatory on Uyuni (API version >= 24)
+if($apiversion >= 24) {
+  $publish = 1;
+}
+
 ###########################
 # Authenticate to the API #
 ###########################
@@ -329,11 +335,13 @@ if (scalar(@includechannels) > 0) { &debug("--include-channels set: ".join(" ", 
 if (scalar(@excludechannels) > 0) { &debug("--exclude-channels set: ".join(" ", @excludechannels)."\n"); }
 
 # Collect unpublished errata
-&info("Checking for unpublished errata\n");
-my $unpuberrata = $client->call('errata.list_unpublished_errata', $session);
-foreach my $errata (@$unpuberrata) {
-  &debug("Found unpublished errata for $errata->{'advisory_name'}\n");
-  $existing{$errata->{'advisory_name'}} = 1;
+unless ($apiversion >= 24) { # only earlier versions have a concept of unpublished errata
+  &info("Checking for unpublished errata\n");
+  my $unpuberrata = $client->call('errata.list_unpublished_errata', $session);
+  foreach my $errata (@$unpuberrata) {
+    &debug("Found unpublished errata for $errata->{'advisory_name'}\n");
+    $existing{$errata->{'advisory_name'}} = 1;
+  }
 }
 
 # Go through each channel 
@@ -580,7 +588,11 @@ foreach my $advisory (sort(keys(%{$xml}))) {
       } else {
         &info("Creating errata for $advid ($xml->{$advisory}->{synopsis}) (1 of 1)\n");
       }
-      $result = $client->call('errata.create', $session, \%erratainfo, \@empty, \@empty, \@packages, $client->boolean(0), \@channels);
+      if ($apiversion >= 24) {
+        $result = $client->call('errata.create', $session, \%erratainfo, \@empty, \@empty, \@packages, \@channels);
+      } else {
+        $result = $client->call('errata.create', $session, \%erratainfo, \@empty, \@empty, \@packages, $client->boolean(0), \@channels);
+      }
       if (defined($result->{faultCode})) {
         &error("Creating Errata $advid FAILED\n");
       } else {
@@ -784,7 +796,7 @@ sub usage {
   print "  --bugfix\t\tImport Bug Fix Advisories [CEBA] (default: all)\n";
   print "  --security\t\tImport Security Advisories [CESA] (default: all)\n";
   print "  --enhancement\t\tImport Enhancement Advisories [CEEA] (default: all)\n";
-  print "  --publish\t\tPublish errata after creation (default: unpublished)\n";
+  print "  --publish\t\tPublish errata after creation (default: unpublished, always true in Uyuni >=2020.06)\n";
   print "  --autopush\t\tAllow server to copy packages around (NOT recommended)\n";
   print "  --ignore-api-version\tContinue if the API version is untested (usually safe)\n";
   print "  --exclude-errata\tExclude Errata that match provided regex\n";
