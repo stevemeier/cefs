@@ -683,41 +683,37 @@ foreach my $advisory (sort(keys(%{$xml}))) {
     &list_packages($advid);
     &find_packages($advisory);
 
-    # Did we find more packages than currently associated?
-    if (@packages > @pkgids) {
-      &info("Adding packages to $advid\n");
-      # Maybe we just need this one call
-      my $addpackages = $client->call('errata.add_packages', $session, $advid, \@packages);
-      $updated++;
-    
-      if ($publish) {
-        # Check which channels the errata currently applies to
-        # We should not republish to this channel, only to new ones
-        my $applicable = $client->call('errata.applicable_to_channels', $session, $advid);
+    &info("Adding packages to $advid\n");
+    # Maybe we just need this one call
+    my $addpackages = $client->call('errata.add_packages', $session, $advid, \@packages);
+    $updated++;
 
-        # Put data into a more handy array
-        my @applicablechannels;
-        foreach (@{$applicable}) { push(@applicablechannels, $_->{'label'}) }
+    if ($publish) {
+      # Check which channels the errata currently applies to
+      # We should not republish to this channel, only to new ones
+      my $applicable = $client->call('errata.applicable_to_channels', $session, $advid);
 
-        my @repubchannels;
-        foreach my $pkg (@packages) {
-          foreach my $channel (only_in_first(\@{$id2channel{$pkg}}, \@applicablechannels)) {
-            push(@repubchannels, $channel);
-          }
+      # Put data into a more handy array
+      my @applicablechannels;
+      foreach (@{$applicable}) { push(@applicablechannels, $_->{'label'}) }
+
+      my @repubchannels;
+      foreach my $pkg (@packages) {
+        foreach my $channel (only_in_first(\@{$id2channel{$pkg}}, \@applicablechannels)) {
+          push(@repubchannels, $channel);
         }
+      }
 
-        @repubchannels = &uniq(@repubchannels);
-            
-        # Only republish if there are channels determined
-        # $#repubchannels will be -1 if @repubchannels is empty
-        if ($#repubchannels >= 0) {
-          &info("Republishing $advid\n");
-          &debug("Republishing $advid to channel ".join(',',@repubchannels)."\n");
-          my $addpackages = $client->call('errata.publish', $session, $advid, \@repubchannels);
-        }   
+      @repubchannels = &uniq(@repubchannels);
+
+      # Only republish if there are channels determined
+      # $#repubchannels will be -1 if @repubchannels is empty
+      if ($#repubchannels >= 0) {
+        &info("Republishing $advid\n");
+        &debug("Republishing $advid to channel ".join(',',@repubchannels)."\n");
+        $client->call('errata.publish', $session, $advid, \@repubchannels);
       }
     }
-
   }
 }
 
