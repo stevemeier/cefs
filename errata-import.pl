@@ -508,9 +508,9 @@ foreach my $advisory (sort(keys(%{$xml}))) {
       if ( defined($rhsaxml->{definitions}->{definition}->{$ovalid}->{metadata}->{description}) ) {
         &debug("Using description from $ovalid\n");
         $erratainfo{'description'} = $rhsaxml->{definitions}->{definition}->{$ovalid}->{metadata}->{description};
-	# 20161214: Remove HTML encodings (ATIX Debian Errata)
-	# 20161220: Always exceute as HTML::Entities is now required
-	decode_entities($erratainfo{'description'}); 
+        # 20161214: Remove HTML encodings (ATIX Debian Errata)
+        # 20161220: Always exceute as HTML::Entities is now required
+        decode_entities($erratainfo{'description'});
         # Remove Umlauts -- API throws errors if they are included
         $erratainfo{'description'} = unidecode($erratainfo{'description'});
         # Limit to length of 4000 bytes (see https://www.redhat.com/archives/spacewalk-list/2012-June/msg00128.html)
@@ -557,7 +557,7 @@ foreach my $advisory (sort(keys(%{$xml}))) {
         }
       } else {
         # one CVE only
-	push(@cves, $xml->{$advisory}->{cves});
+        push(@cves, $xml->{$advisory}->{cves});
       }
     }
 
@@ -609,23 +609,23 @@ foreach my $advisory (sort(keys(%{$xml}))) {
           }
         }
 
-	# Add severity to security errata (requires API version 21 or higher)
-	if ($apiversion >= 21) {
+        # Add severity to security errata (requires API version 21 or higher)
+        if ($apiversion >= 21) {
           if ($advid =~ /CESA/ix) {
-	    if (defined($xml->{$advisory}->{severity})) {
+            if (defined($xml->{$advisory}->{severity})) {
               if ( ($xml->{$advisory}->{severity} eq 'Low') ||
-	           ($xml->{$advisory}->{severity} eq 'Moderate') ||
-		   ($xml->{$advisory}->{severity} eq 'Important') ||
-		   ($xml->{$advisory}->{severity} eq 'Critical') ){
+                   ($xml->{$advisory}->{severity} eq 'Moderate') ||
+                   ($xml->{$advisory}->{severity} eq 'Important') ||
+                   ($xml->{$advisory}->{severity} eq 'Critical') ){
 
                 &info("Adding severity (".$xml->{$advisory}->{severity}.") to $advid\n");
                 undef %erratadetails;
                 $erratadetails{'severity'} = $xml->{$advisory}->{severity};
                 $result = $client->call('errata.set_details', $session, $advid, \%erratadetails);
               }
-	    }
+            }
           }
-	}
+        }
 
         # Do extra stuff if --publish is set
         if ($publish) {
@@ -662,10 +662,10 @@ foreach my $advisory (sort(keys(%{$xml}))) {
               if (@autopushed >= 1) {
                 &debug("Package $pkg has been auto-pushed to ".join(',',@autopushed)."\n");
                 foreach my $undopush (@autopushed) {
-	          if (&in_scope($undopush)) {  # Added to fix GitHub issue #21
+                  if (&in_scope($undopush)) {  # Added to fix GitHub issue #21
                     &debug("Removing package $pkg from $undopush\n");
                     $result = $client->call('channel.software.remove_packages', $session, $undopush, $pkg);
-		  }
+                  }
                 }
               } 
             }
@@ -708,9 +708,9 @@ foreach my $advisory (sort(keys(%{$xml}))) {
 
         @repubchannels = &uniq(@repubchannels);
             
-	# Only republish if there are channels determined
-	# $#repubchannels will be -1 if @repubchannels is empty
-	if ($#repubchannels >= 0) {
+        # Only republish if there are channels determined
+        # $#repubchannels will be -1 if @repubchannels is empty
+        if ($#repubchannels >= 0) {
           &info("Republishing $advid\n");
           &debug("Republishing $advid to channel ".join(',',@repubchannels)."\n");
           my $addpackages = $client->call('errata.publish', $session, $advid, \@repubchannels);
