@@ -370,6 +370,12 @@ foreach my $channel (sort(@$channellist)) {
     }
   }
 
+  # Check if channel is a vendor channel
+  if ($channel->{'provider_name'} eq 'SUSE') {
+    &info("Excluding vendor channel $channel->{'name'} ($channel->{'label'})\n");
+    next;
+  }
+
   # Sync channels to repo before scanning
   if ($syncchannels) {
     &debug("Getting channel.software.get_details for $channel->{'label'}\n");
