@@ -594,101 +594,107 @@ foreach my $advisory (sort(keys(%{$xml}))) {
       } else {
         &info("Creating errata for $advid ($xml->{$advisory}->{synopsis}) (1 of 1)\n");
       }
-      if ($apiversion >= 24) {
-        $result = $client->call('errata.create', $session, \%erratainfo, \@empty, \@empty, \@packages, \@channels);
-      } else {
-        $result = $client->call('errata.create', $session, \%erratainfo, \@empty, \@empty, \@packages, $client->boolean(0), \@channels);
+      eval {
+        if ($apiversion >= 24) {
+          $result = $client->call('errata.create', $session, \%erratainfo, \@empty, \@empty, \@packages, \@channels);
+        } else {
+          $result = $client->call('errata.create', $session, \%erratainfo, \@empty, \@empty, \@packages, $client->boolean(0), \@channels);
+        }
+      };
+      if ($@) {
+        my $error = $@;
+        if ($error =~ m/fault code 2601:/) {
+          &info("Errata for $advid already exists, reusing\n");
+        } else {
+          die $error;
+        }
       }
-      if (defined($result->{faultCode})) {
-        &error("Creating Errata $advid FAILED\n");
-      } else {
-        $created++;
 
-        # Add keywords
-        if (@keywords >= 1) {
-          &info("Adding keywords to $advid\n");
-          &debug("Keywords in $advid: ".join(',', @keywords)."\n");
-          %erratadetails = ( "keywords" => [ @keywords ] );
+      $created++;
+
+      # Add keywords
+      if (@keywords >= 1) {
+        &info("Adding keywords to $advid\n");
+        &debug("Keywords in $advid: ".join(',', @keywords)."\n");
+        %erratadetails = ( "keywords" => [ @keywords ] );
+        $result = $client->call('errata.set_details', $session, $advid, \%erratadetails);
+      }
+
+      # Add issue date (requires API version 12 or higher)
+      if ($apiversion >= 12) {
+        if (defined($xml->{$advisory}->{issue_date})) {
+          if ($xml->{$advisory}->{issue_date} =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}:\d{2}:\d{2})/) {
+            &info("Adding issue date to $advid\n");
+            undef %erratadetails;
+            $erratadetails{'issue_date'} = $client->date_time("$1$2$3T$4");
+            $erratadetails{'update_date'} = $client->date_time("$1$2$3T$4");
+            $result = $client->call('errata.set_details', $session, $advid, \%erratadetails);
+          } else {
+            &warning("$advid has no proper issue date\n");
+          }
+        }
+      }
+
+      # Add severity to security errata (requires API version 21 or higher)
+      if ($apiversion >= 21) {
+        if ($advid =~ /CESA/ix) {
+          if (defined($xml->{$advisory}->{severity})) {
+            if ( ($xml->{$advisory}->{severity} eq 'Low') ||
+                  ($xml->{$advisory}->{severity} eq 'Moderate') ||
+                  ($xml->{$advisory}->{severity} eq 'Important') ||
+                  ($xml->{$advisory}->{severity} eq 'Critical') ){
+
+              &info("Adding severity (".$xml->{$advisory}->{severity}.") to $advid\n");
+              undef %erratadetails;
+              $erratadetails{'severity'} = $xml->{$advisory}->{severity};
+              $result = $client->call('errata.set_details', $session, $advid, \%erratadetails);
+            }
+          }
+        }
+      }
+
+      # Do extra stuff if --publish is set
+      if ($publish) {
+        # Publish the Errata (seperated from creation on purpose)
+        &info("Publishing Errata for $advid\n");
+        $result = $client->call('errata.publish', $session, $advid, \@channels);
+        if (defined($result->{faultCode})) { &error("Publishing Errata $advid FAILED\n"); }
+
+        # CVEs can only be added to published errata. Why? I have no idea.
+        if (@cves >= 1) {
+          &info("Adding CVE information to $advid\n");
+          &debug("CVEs in $advid: ".join(',', @cves)."\n");
+          %erratadetails = ( "cves" => [ @cves ] );
           $result = $client->call('errata.set_details', $session, $advid, \%erratadetails);
         }
 
-        # Add issue date (requires API version 12 or higher)
-        if ($apiversion >= 12) {
-          if (defined($xml->{$advisory}->{issue_date})) {
-            if ($xml->{$advisory}->{issue_date} =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}:\d{2}:\d{2})/) {
-              &info("Adding issue date to $advid\n");
-              undef %erratadetails;
-              $erratadetails{'issue_date'} = $client->date_time("$1$2$3T$4");
-              $erratadetails{'update_date'} = $client->date_time("$1$2$3T$4");
-              $result = $client->call('errata.set_details', $session, $advid, \%erratadetails);
-            } else {
-              &warning("$advid has no proper issue date\n");
+        # Reverse useless copying of packages around by publish
+        if (not($autopush)) {
+          foreach my $pkg (@packages) {
+            # Log previous and current channel membership
+            @autopushed = ();
+            @inchannel = ();
+            &debug("Previous channel membership for $pkg: ".join(',',@{$id2channel{$pkg}})."\n");
+            $channellist = $client->call('packages.list_providing_channels', $session, $pkg);
+            foreach my $channel (@$channellist) {
+                push(@inchannel, $channel->{label});
             }
-          }
-        }
+            &debug("Current channel membership for $pkg: ".join(',',@inchannel)."\n");
 
-        # Add severity to security errata (requires API version 21 or higher)
-        if ($apiversion >= 21) {
-          if ($advid =~ /CESA/ix) {
-            if (defined($xml->{$advisory}->{severity})) {
-              if ( ($xml->{$advisory}->{severity} eq 'Low') ||
-                   ($xml->{$advisory}->{severity} eq 'Moderate') ||
-                   ($xml->{$advisory}->{severity} eq 'Important') ||
-                   ($xml->{$advisory}->{severity} eq 'Critical') ){
+            @autopushed = only_in_first(\@inchannel, \@{$id2channel{$pkg}});
+            @autopushed = &uniq(@autopushed);
 
-                &info("Adding severity (".$xml->{$advisory}->{severity}.") to $advid\n");
-                undef %erratadetails;
-                $erratadetails{'severity'} = $xml->{$advisory}->{severity};
-                $result = $client->call('errata.set_details', $session, $advid, \%erratadetails);
-              }
-            }
-          }
-        }
-
-        # Do extra stuff if --publish is set
-        if ($publish) {
-          # Publish the Errata (seperated from creation on purpose)
-          &info("Publishing Errata for $advid\n");
-          $result = $client->call('errata.publish', $session, $advid, \@channels);
-          if (defined($result->{faultCode})) { &error("Publishing Errata $advid FAILED\n"); }
-
-          # CVEs can only be added to published errata. Why? I have no idea.
-          if (@cves >= 1) {
-            &info("Adding CVE information to $advid\n");
-            &debug("CVEs in $advid: ".join(',', @cves)."\n");
-            %erratadetails = ( "cves" => [ @cves ] );
-            $result = $client->call('errata.set_details', $session, $advid, \%erratadetails);
-          }
-          
-          # Reverse useless copying of packages around by publish
-          if (not($autopush)) {
-            foreach my $pkg (@packages) {
-              # Log previous and current channel membership
-              @autopushed = ();
-              @inchannel = ();
-              &debug("Previous channel membership for $pkg: ".join(',',@{$id2channel{$pkg}})."\n");
-              $channellist = $client->call('packages.list_providing_channels', $session, $pkg);
-              foreach my $channel (@$channellist) {
-                 push(@inchannel, $channel->{label});
-              }
-              &debug("Current channel membership for $pkg: ".join(',',@inchannel)."\n");
-
-              @autopushed = only_in_first(\@inchannel, \@{$id2channel{$pkg}});
-              @autopushed = &uniq(@autopushed);
-
-              # Remove packages from channel(s) it didn't belong to earlier
-              if (@autopushed >= 1) {
-                &debug("Package $pkg has been auto-pushed to ".join(',',@autopushed)."\n");
-                foreach my $undopush (@autopushed) {
-                  if (&in_scope($undopush)) {  # Added to fix GitHub issue #21
-                    &debug("Removing package $pkg from $undopush\n");
-                    $result = $client->call('channel.software.remove_packages', $session, $undopush, $pkg);
-                  }
+            # Remove packages from channel(s) it didn't belong to earlier
+            if (@autopushed >= 1) {
+              &debug("Package $pkg has been auto-pushed to ".join(',',@autopushed)."\n");
+              foreach my $undopush (@autopushed) {
+                if (&in_scope($undopush)) {  # Added to fix GitHub issue #21
+                  &debug("Removing package $pkg from $undopush\n");
+                  $result = $client->call('channel.software.remove_packages', $session, $undopush, $pkg);
                 }
-              } 
+              }
             }
           }
-
         }
       }
     } else {
