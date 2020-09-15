@@ -73,6 +73,7 @@
 # 20200106 - Confirmed fix for https://github.com/stevemeier/cefs/issues/21
 # 20200322 - Added support for API Version 23 in SW 2.10
 # 20200707 - Added support for API Version 24 in Uyuni 2020.06
+# 20200909 - Merged https://github.com/stevemeier/cefs/pull/29
 
 # Load modules
 use strict;
@@ -88,7 +89,7 @@ import XML::Simple;
 import HTML::Entities;
 
 # Version information
-my $version = "20200807";
+my $version = "20200909";
 my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0','18','18.0','19','19.0','20','20.0','21','21.0','22','22.0','23','23.0', '24');
 
 # Disable output buffering
@@ -368,12 +369,6 @@ foreach my $channel (sort(@$channellist)) {
       &info("Excluding channel $channel->{'name'} ($channel->{'label'})\n");
       next;
     }
-  }
-
-  # Check if channel is a vendor channel
-  if ($channel->{'provider_name'} eq 'SUSE') {
-    &info("Excluding vendor channel $channel->{'name'} ($channel->{'label'})\n");
-    next;
   }
 
   # Sync channels to repo before scanning
