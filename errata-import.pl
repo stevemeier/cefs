@@ -5,7 +5,8 @@
 # is the road to madness...
 #
 # To run this script on CentOS you need 
-# perl-XML-Simple, perl-Text-Unidecode, perl-Frontier-RPC and perl-DateTime
+# perl-XML-Simple, perl-Text-Unidecode, perl-Frontier-RPC 
+# and perl-Time-ParseDate
 #
 # Author: Steve Meier
 #
@@ -88,7 +89,7 @@ import Frontier::Client;
 import Text::Unidecode;
 import XML::Simple;
 import HTML::Entities;
-import DateTime;
+import Date::Parse;
 
 # Version information
 my $version = "20200909";
@@ -469,12 +470,8 @@ foreach my $advisory (sort(keys(%{$xml}))) {
 
   # Check command line options for errata to consider
   if ($recent > 0) {
-    if ((my $issueyear, my $issuemonth, my $issueday) = 
-        $xml->{$advisory}->{issue_date} =~ 
-        /(\d{4})-(\d{2})-(\d{2}) \d{2}:\d{2}:\d{2}/) {
-      my $issued = DateTime->new(year => $issueyear, month => $issuemonth, 
-        day => $issueday);
-      if ( DateTime->now()->delta_days($issued)->delta_days() > $recent ) {
+    if ( my $issued = str2time($xml->{$advisory}->{issue_date}) ) {
+      if ( ( time() - $issued ) / 60 / 60 / 24 > $recent ) {
         &debug("Skipping $advid. Not a recent errata.\n");
         next;
       }
@@ -862,10 +859,10 @@ sub eval_modules {
 
 
   eval {
-    require DateTime;
+    require Date::Parse;
     1;
   } or do {
-    die "ERROR: You are missing DateTime\n       CentOS: yum install perl-DateTime\n";
+    die "ERROR: You are missing Date::Parse\n       CentOS: yum install perl-Time-ParseDate\n";
   };
 
   return;
