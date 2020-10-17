@@ -22,6 +22,14 @@ GetOptions( 'server=s' => \$server,
             'debug'    => \$debug,
            );
 
+####################
+# Check parameters #
+####################
+if (not(defined($server))) {
+  &error("Please define a server (--server)\n");
+  exit(1);
+}
+
 #############################
 # Initialize API connection #
 #############################
