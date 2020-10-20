@@ -1004,7 +1004,7 @@ sub find_packages_by_advisory {
   &debug("find_packages packages: " . join(",", @packages) . "\n");
   &debug("find_packages channels: " . join(",", @channels) . "\n");
  
-  return (@packages, @channels);
+  return \@packages, \@channels;
 }
 
 sub list_packages {
