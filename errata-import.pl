@@ -5,7 +5,8 @@
 # is the road to madness...
 #
 # To run this script on CentOS you need 
-# perl-XML-Simple, perl-Text-Unidecode and perl-Frontier-RPC
+# perl-XML-Simple, perl-Text-Unidecode, perl-Frontier-RPC 
+# and perl-Time-ParseDate
 #
 # Author: Steve Meier
 #
@@ -74,6 +75,7 @@
 # 20200322 - Added support for API Version 23 in SW 2.10
 # 20200707 - Added support for API Version 24 in Uyuni 2020.06
 # 20200909 - Merged https://github.com/stevemeier/cefs/pull/29
+# 20200918 - Added --recent option
 
 # Load modules
 use strict;
@@ -87,6 +89,7 @@ import Frontier::Client;
 import Text::Unidecode;
 import XML::Simple;
 import HTML::Entities;
+import Date::Parse;
 
 # Version information
 my $version = "20200909";
@@ -135,6 +138,7 @@ my $publish = 0; # do not publish by default
 my $security = 0;
 my $bugfix = 0;
 my $enhancement = 0;
+my $recent = 0;
 my $created = 0;
 my $updated = 0;
 my $debug = 0;
@@ -174,6 +178,7 @@ $getopt = GetOptions( 'server=s'              => \$server,
                       'security'              => \$security,
                       'bugfix'                => \$bugfix,
                       'enhancement'           => \$enhancement,
+                      'recent=i'              => \$recent,
                       'sync-channels'         => \$syncchannels,
                       'sync-timeout=i'        => \$synctimeout,
                       'include-channels:s{,}' => \@includechannels,
@@ -428,10 +433,10 @@ foreach my $channel (sort(@$channellist)) {
   foreach my $pkg (@$allpkg) {
 
     # Get the details of the current package
-    $pkgdetails = $client->call('packages.get_details', $session, $pkg->{id});
-    &debug("Package ID $pkg->{id} is $pkgdetails->{'file'}\n");
-    $name2id{$pkgdetails->{'file'}} = $pkg->{id};
-    $name2channel{$pkgdetails->{'file'}} = $channel->{'label'};
+    # $pkgdetails = $client->call('packages.get_details', $session, $pkg->{id});
+    # &debug("Package ID $pkg->{id} is $pkgdetails->{'file'}\n");
+    # $name2id{$pkgdetails->{'file'}} = $pkg->{id};
+    # $name2channel{$pkgdetails->{'file'}} = $channel->{'label'};
     push(@{$id2channel{$pkg->{id}}}, $channel->{'label'}); 
   }
 }
@@ -446,7 +451,7 @@ foreach my $advisory (sort(keys(%{$xml}))) {
   # Check for reauthentication
   if (time > ($authtime + 5400)) { &reauthenticate; }
 
-  # Restore "proper" name of adivsory
+  # Restore "proper" name of advisory
   $advid = $advisory;
   $advid =~ s/--/:/;
   
@@ -464,6 +469,15 @@ foreach my $advisory (sort(keys(%{$xml}))) {
   }
 
   # Check command line options for errata to consider
+  if ($recent > 0) {
+    if ( my $issued = str2time($xml->{$advisory}->{issue_date}) ) {
+      if ( ( time() - $issued ) / 60 / 60 / 24 > $recent ) {
+        &debug("Skipping $advid. Not a recent errata.\n");
+        next;
+      }
+    }
+  }
+
   if ($security || $bugfix || $enhancement) {
     if ( ($advisory =~ /^CESA/) && (not($security)) ) {
       &debug("Skipping $advid. Security Errata not selected.\n");
@@ -498,7 +512,8 @@ foreach my $advisory (sort(keys(%{$xml}))) {
     # Errata does not exist yet
     
     # Find package IDs mentioned in errata
-    &find_packages($advisory);
+    # &find_packages($advisory);
+    &find_packages_by_advisory($advisory);
 
     # Create Errata Info hash
     %erratainfo = ( "synopsis"         => "$xml->{$advisory}->{synopsis}",
@@ -700,9 +715,10 @@ foreach my $advisory (sort(keys(%{$xml}))) {
   } else {
     &info("Errata for $advid already exists\n");
     &list_packages($advid);
-    &find_packages($advisory);
+    # &find_packages($advisory);
+    &find_packages_by_advisory($advisory);
 
-    &info("Adding packages to $advid\n");
+    &info("Adding packages to $advid: " . join(',', @packages) . "\n");
     # Maybe we just need this one call
     my $addpackages = $client->call('errata.add_packages', $session, $advid, \@packages);
     $updated++;
@@ -781,7 +797,7 @@ sub usage {
   print "       [ --rhsa-oval <REDHAT-OVAL-XML> |\n";
   print "         --include-channels=<CHANNELS> | --exclude-channels=<CHANNELS> |\n";
   print "         --sync-channels | --sync-timeout=<TIMEOUT> |\n";
-  print "         --bugfix | --security | --enhancement |\n";
+  print "         --bugfix | --security | --enhancement | --recent=<DAYS> |\n";
   print "         --publish | --autopush | --ignore-api-version\n";
   print "         --exclude-errata=<REGEX>\n";
   print "         --quiet | --debug ]\n";
@@ -799,6 +815,7 @@ sub usage {
   print "  --bugfix\t\tImport Bug Fix Advisories [CEBA] (default: all)\n";
   print "  --security\t\tImport Security Advisories [CESA] (default: all)\n";
   print "  --enhancement\t\tImport Enhancement Advisories [CEEA] (default: all)\n";
+  print "  --recent\t\tImport recent advisories within number of days (default: all)\n";
   print "  --publish\t\tPublish errata after creation (default: unpublished, always true in Uyuni >=2020.06)\n";
   print "  --autopush\t\tAllow server to copy packages around (NOT recommended)\n";
   print "  --ignore-api-version\tContinue if the API version is untested (usually safe)\n";
@@ -840,6 +857,14 @@ sub eval_modules {
     die "ERROR: You are missing HTML::Entities\n       CentOS: yum install perl-HTML-Parser\n";
   };
 
+
+  eval {
+    require Date::Parse;
+    1;
+  } or do {
+    die "ERROR: You are missing Date::Parse\n       CentOS: yum install perl-Time-ParseDate\n";
+  };
+
   return;
 }
 
@@ -875,7 +900,7 @@ sub reauthenticate {
 
 sub find_packages {
   my ($advisory) = @_;
-  #  INPUT: Advisory, e.g. CESA-2013:0123
+  #  INPUT: Advisory, e.g. CESA-2013--0123
   # OUTPUT: Array of Package IDs, Array of Channel Labels
 
   # Find package IDs mentioned in errata
@@ -907,7 +932,79 @@ sub find_packages {
     }
   }
 
+  &debug("find_packages advisory: $advisory\n");
+  &debug("find_packages packages: " . join(",", @packages) . "\n");
+  &debug("find_packages channels: " . join(",", @channels) . "\n");
+
   return;
+}
+
+sub find_package_by_name {
+  my ($package) = @_;
+  #  INPUT: Package, e.g. perl-5.16.3-295.el7.x86_64.rpm
+  # OUTPUT: Array of Package IDs, Array of Channel Labels
+  my @ids = ();
+  my @chans = ();
+  my ($name, $ver, $rel, $arch) = 
+    $package =~ m/([^ ]+)-(.+)-(.+)\.([a-z0-9_]+)\.rpm$/;
+  my $pkgs = $client->call('packages.findByNvrea', $session,
+    Frontier::Client->string($name), Frontier::Client->string($ver), 
+    Frontier::Client->string($rel), "", 
+    Frontier::Client->string($arch));
+  foreach my $pkg ( @$pkgs ) {
+    push(@ids, int($pkg->{'id'}));
+    my $chanlist = $client->call('packages.listProvidingChannels', 
+      $session, $pkg->{'id'});
+    foreach my $chan ( @$chanlist ) {
+      push(@chans, $chan->{'label'});
+    } 
+  }
+  @ids = &uniq(@ids);
+  @chans = &uniq(@chans);
+
+  return \@ids, \@chans;
+}
+
+sub find_packages_by_advisory {
+  my ($advisory) = @_;
+  #  INPUT: Advisory, e.g. CESA-2013--0123
+  # OUTPUT: Array of Package IDs, Array of Channel Labels
+
+  # Find package IDs mentioned in errata
+  if ( ref($xml->{$advisory}->{packages}) eq 'ARRAY') {
+    foreach my $package ( @{$xml->{$advisory}->{packages}} ) {
+      my ($pkgids, $chans) = &find_package_by_name($package);
+      foreach my $pkgid ( @$pkgids ) {
+        push(@packages, int($pkgid));
+      }
+      foreach my $chan ( @$chans ) {
+        push(@channels, $chan);
+      }
+    }
+  } else {
+    # errata has only one package
+    my ($pkgids, $chans) = &find_package_by_name($xml->{$advisory}->{packages});
+    foreach my $pkgid ( @$pkgids ) {
+      push(@packages, int($pkgid));
+    }
+    foreach my $chan ( @$chans ) {
+      push(@channels, $chan);
+    }
+ 
+    if ( scalar @packages == 0 ) {
+      # no hit
+      &debug("Package: $xml->{$advisory}->{packages} not found\n");
+    }
+  }
+  # Ugly hack :)
+  @packages = &uniq(@packages);
+  @channels = &uniq(@channels);
+
+  &debug("find_packages advisory: $advisory\n");
+  &debug("find_packages packages: " . join(",", @packages) . "\n");
+  &debug("find_packages channels: " . join(",", @channels) . "\n");
+ 
+  return \@packages, \@channels;
 }
 
 sub list_packages {
@@ -916,12 +1013,12 @@ sub list_packages {
   # OUTPUT: Array of Package IDs
  
   @pkgids = ();
-  my $listpackages = $client->call('errata.list_packages', $session, $advisory);
+  my $listpackages = $client->call('errata.listPackages', $session, $advisory);
   foreach my $package (@$listpackages) {
     push(@pkgids, $package->{'id'});
   }
 
-  &debug("$advisory packages: ".join(' ',@pkgids)."\n");
+  &debug("list_packages: $advisory ".join(' ',@pkgids)."\n");
 
   return;
 }
