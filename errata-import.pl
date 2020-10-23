@@ -76,6 +76,8 @@
 # 20200707 - Added support for API Version 24 in Uyuni 2020.06
 # 20200909 - Merged https://github.com/stevemeier/cefs/pull/29
 # 20200918 - Added --recent option
+# 20201023 - Revert to previous find_packages function to fix
+#            https://github.com/stevemeier/cefs/issues/31
 
 # Load modules
 use strict;
@@ -92,7 +94,7 @@ import HTML::Entities;
 import Date::Parse;
 
 # Version information
-my $version = "20201020";
+my $version = "20201023";
 my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0','18','18.0','19','19.0','20','20.0','21','21.0','22','22.0','23','23.0', '24');
 
 # Disable output buffering
@@ -350,6 +352,10 @@ unless ($apiversion >= 24) { # only earlier versions have a concept of unpublish
   }
 }
 
+# Getopt::Long is a bit stupid, so we have to do some manual work to the parameters
+@includechannels = split(/,/, join(',',@includechannels));
+@excludechannels = split(/,/, join(',',@excludechannels));
+
 # Go through each channel 
 foreach my $channel (sort(@$channellist)) {
 
@@ -362,7 +368,7 @@ foreach my $channel (sort(@$channellist)) {
 
   # Check if channel is included
   if (scalar(@includechannels) > 0) {
-    if (not(grep { /$channel->{'label'}/ } @includechannels)) {
+    if (not(grep { $channel->{'label'} eq $_ } @includechannels)) {
       &info("Channel $channel->{'name'} ($channel->{'label'}) is NOT included\n");
       next;
     }
@@ -370,7 +376,7 @@ foreach my $channel (sort(@$channellist)) {
 
   # Check if channel is excluded
   if (scalar(@excludechannels) > 0) {
-    if (grep { /$channel->{'label'}/ } @excludechannels ) {
+    if (grep { $channel->{'label'} eq $_ } @excludechannels ) {
       &info("Excluding channel $channel->{'name'} ($channel->{'label'})\n");
       next;
     }
@@ -433,10 +439,10 @@ foreach my $channel (sort(@$channellist)) {
   foreach my $pkg (@$allpkg) {
 
     # Get the details of the current package
-    # $pkgdetails = $client->call('packages.get_details', $session, $pkg->{id});
-    # &debug("Package ID $pkg->{id} is $pkgdetails->{'file'}\n");
-    # $name2id{$pkgdetails->{'file'}} = $pkg->{id};
-    # $name2channel{$pkgdetails->{'file'}} = $channel->{'label'};
+    $pkgdetails = $client->call('packages.get_details', $session, $pkg->{id});
+    &debug("Package ID $pkg->{id} is $pkgdetails->{'file'}\n");
+    $name2id{$pkgdetails->{'file'}} = $pkg->{id};
+    $name2channel{$pkgdetails->{'file'}} = $channel->{'label'};
     push(@{$id2channel{$pkg->{id}}}, $channel->{'label'}); 
   }
 }
@@ -512,8 +518,8 @@ foreach my $advisory (sort(keys(%{$xml}))) {
     # Errata does not exist yet
     
     # Find package IDs mentioned in errata
-    # &find_packages($advisory);
-    &find_packages_by_advisory($advisory);
+    &find_packages($advisory);
+    # &find_packages_by_advisory($advisory);
 
     # Create Errata Info hash
     %erratainfo = ( "synopsis"         => "$xml->{$advisory}->{synopsis}",
@@ -715,8 +721,8 @@ foreach my $advisory (sort(keys(%{$xml}))) {
   } else {
     &info("Errata for $advid already exists\n");
     &list_packages($advid);
-    # &find_packages($advisory);
-    &find_packages_by_advisory($advisory);
+    &find_packages($advisory);
+    # &find_packages_by_advisory($advisory);
 
     &info("Adding packages to $advid: " . join(',', @packages) . "\n");
     # Maybe we just need this one call
