@@ -78,6 +78,7 @@
 # 20200918 - Added --recent option
 # 20201023 - Revert to previous find_packages function to fix
 #            https://github.com/stevemeier/cefs/issues/31
+# 20210303 - Added support for API Version 25 in Uyuni 2021.02
 
 # Load modules
 use strict;
@@ -94,8 +95,9 @@ import HTML::Entities;
 import Date::Parse;
 
 # Version information
-my $version = "20201023";
-my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0','18','18.0','19','19.0','20','20.0','21','21.0','22','22.0','23','23.0', '24');
+my $version = "20210303";
+my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0','18','18.0','19','19.0',
+                     '20','20.0','21','21.0','22','22.0','23','23.0','24','25');
 
 # Disable output buffering
 *STDOUT->autoflush();
@@ -103,12 +105,12 @@ my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0',
 
 # Spacewalk Version => API cheatsheet
 # 0.6 => 10.9  == TESTED
-# 0.7 => ??
-# 0.8 => ??
+# 0.7 => 10.10
+# 0.8 => 10.11
 # 1.0 => 10.11
 # 1.1 => 10.11 == TESTED
 # 1.2 => 10.15
-# 1.3 => ??
+# 1.3 => 10.16
 # 1.4 => 10.16
 # 1.5 => 11.00 == TESTED
 # 1.6 => 11.1  == TESTED
@@ -120,12 +122,14 @@ my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0',
 # 2.2 => 15    == TESTED
 # 2.3 => 16    == TESTED
 # 2.4 => 17
-# 2.5 => 18 ??
+# 2.5 => 18
 # 2.6 => 19
 # 2.7 => 20
 # 2.8 => 21
 # 2.9 => 22    == TESTED
 # 2.10 => 23   == TESTED
+# Uyuni 2020.06 => 24
+# Uyuni 2021.02 => 25
 
 # Variable declation
 my $server;
