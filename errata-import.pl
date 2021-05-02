@@ -79,6 +79,7 @@
 # 20201023 - Revert to previous find_packages function to fix
 #            https://github.com/stevemeier/cefs/issues/31
 # 20210303 - Added support for API Version 25 in Uyuni 2021.02
+# 20210501 - Work on https://github.com/stevemeier/cefs/issues/33
 
 # Load modules
 use strict;
@@ -95,7 +96,7 @@ import HTML::Entities;
 import Date::Parse;
 
 # Version information
-my $version = "20210303";
+my $version = "20210501";
 my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0','18','18.0','19','19.0',
                      '20','20.0','21','21.0','22','22.0','23','23.0','24','25');
 
@@ -130,6 +131,7 @@ my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0',
 # 2.10 => 23   == TESTED
 # Uyuni 2020.06 => 24
 # Uyuni 2021.02 => 25
+# Uyuni 2021.04 => 25 (although there were API changes)
 
 # Variable declation
 my $server;
@@ -170,6 +172,8 @@ my $authtime;
 my $ignoreapiversion;
 my $excludeerrata;
 my @channelscope;
+my $systemversion = '';
+my $setadvstatus = 0;
 
 # Print call and parameters if in debug mode (GetOptions will clear @ARGV)
 if (join(' ',@ARGV) =~ /--debug/) { print STDERR "DEBUG: Called as $0 ".join(' ',@ARGV)."\n"; }
@@ -220,6 +224,17 @@ if ($apiversion = $client->call('api.get_version')) {
 } else {
   &error("Could not determine API version on server\n");
   exit 1;
+}
+
+####################################################################
+# We also need systemVersion to tell certain server versions apart #
+####################################################################
+if ($systemversion = $client->call('api.system_version')) {
+  &info("Server is running SYSTEM version $systemversion\n");
+  if ($systemversion eq '2021.04') {
+    # See https://github.com/stevemeier/cefs/issues/33
+    $setadvstatus = 1;
+  }
 }
 
 #####################################
@@ -536,6 +551,12 @@ foreach my $advisory (sort(keys(%{$xml}))) {
                     "references"       => "$xml->{$advisory}->{references}",
                     "notes"            => "$xml->{$advisory}->{notes}",
                     "solution"         => "$xml->{$advisory}->{solution}" );
+
+    # See https://github.com/stevemeier/cefs/issues/33#issuecomment-829433892
+    if ($setadvstatus) {
+      &debug("Setting advisory_status to final for $advid\n");
+      $erratainfo{'advisory_status'} = "final";
+    }
 
     # Insert description from Red Hat OVAL file, if available (only for Security)
     if (defined($ovalid)) {
