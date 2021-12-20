@@ -80,6 +80,8 @@
 #            https://github.com/stevemeier/cefs/issues/31
 # 20210303 - Added support for API Version 25 in Uyuni 2021.02
 # 20210501 - Work on https://github.com/stevemeier/cefs/issues/33
+# 20211220 - Provide proper error message on Red Hat's compressed OVAL file
+#            https://github.com/stevemeier/cefs/issues/38
 
 # Load modules
 use strict;
@@ -96,7 +98,7 @@ import HTML::Entities;
 import Date::Parse;
 
 # Version information
-my $version = "20210501";
+my $version = "20211220";
 my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0','18','18.0','19','19.0',
                      '20','20.0','21','21.0','22','22.0','23','23.0','24','25');
 
@@ -329,6 +331,10 @@ if (defined($xml->{meta}->{minver})) {
 ##################################
 if (defined($rhsaovalfile)) {
   if (-f $rhsaovalfile) {
+    if (&read_first_bytes_from_file($rhsaovalfile,2) eq 'BZ') {
+      &error("$rhsaovalfile is bzip2 compressed. Please uncompress first, this script can not read it\n");
+      exit 6;
+    }
     &info("Loading Red Hat OVAL XML\n");
     if (not($rhsaxml = XMLin($rhsaovalfile))) {
       &error("Could not parse Red Hat OVAL file!\n");
@@ -1081,4 +1087,20 @@ sub in_scope {
   }
 
   return 0;
+}
+
+sub read_first_bytes_from_file {
+  my $filename = shift;
+  my $count = shift;
+
+  if (not(-r "$filename")) { return "" };
+
+  open(my $FH, '<', "$filename") or return "";
+  binmode($FH);
+
+  my $buffer;
+  read($FH, $buffer, $count);
+  close($FH);
+
+  return $buffer;
 }
