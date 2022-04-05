@@ -82,6 +82,7 @@
 # 20210501 - Work on https://github.com/stevemeier/cefs/issues/33
 # 20211220 - Provide proper error message on Red Hat's compressed OVAL file
 #            https://github.com/stevemeier/cefs/issues/38
+# 20220405 - Added support for API Version 26 in Uyuni 2022.03
 
 # Load modules
 use strict;
@@ -98,9 +99,9 @@ import HTML::Entities;
 import Date::Parse;
 
 # Version information
-my $version = "20211220";
+my $version = "20220405";
 my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0','15','15.0','16','16.0','17','17.0','18','18.0','19','19.0',
-                     '20','20.0','21','21.0','22','22.0','23','23.0','24','25');
+                     '20','20.0','21','21.0','22','22.0','23','23.0','24','25','26');
 
 # Disable output buffering
 *STDOUT->autoflush();
@@ -134,6 +135,7 @@ my @supportedapi = ( '10.9','10.11','11.00','11.1','12','13','13.0','14','14.0',
 # Uyuni 2020.06 => 24
 # Uyuni 2021.02 => 25
 # Uyuni 2021.04 => 25 (although there were API changes)
+# Uyuni 2022.03 => 26
 
 # Variable declation
 my $server;
